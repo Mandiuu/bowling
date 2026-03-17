@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bowling — Despedida de Seba</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #f7f5f2; color: #1c1c1c;
+  min-height: 100vh; padding: 64px 24px 80px;
+  position: relative;
+}
+#bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.container { max-width: 480px; margin: 0 auto; position: relative; z-index: 1; }
+h1 { font-family: 'DM Serif Display', serif; font-size: clamp(36px, 9vw, 56px); line-height: 1.05; font-weight: 400; margin-bottom: 12px; }
+.capacity-note { font-size: 14px; color: #888; margin-bottom: 16px; line-height: 1.5; }
+.capacity-note strong { color: #1c1c1c; }
+.capacity-note.full { color: #c0392b; }
+.capacity-note.full strong { color: #c0392b; }
+.event-detail { font-size: 14px; color: #999; font-style: italic; margin-bottom: 40px; }
+hr { border: none; border-top: 1px solid #e0dcd6; margin: 32px 0; }
+.form-row { display: flex; gap: 10px; }
+input[type="text"] {
+  flex: 1; font-family: 'DM Sans', sans-serif; font-size: 16px;
+  background: white; border: 1.5px solid #e0dcd6; border-radius: 8px;
+  padding: 12px 16px; outline: none; transition: border-color 0.15s; color: #1c1c1c;
+}
+input[type="text"]:focus { border-color: #999; }
+input[type="text"]::placeholder { color: #bbb; }
+button {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  background: #1c1c1c; color: #f7f5f2; border: none; padding: 12px 22px;
+  border-radius: 8px; cursor: pointer; transition: background 0.15s; white-space: nowrap;
+}
+button:hover { background: #333; }
+button:disabled { background: #ccc; cursor: default; }
+.error-msg { font-size: 13px; color: #c0392b; margin-top: 8px; min-height: 18px; }
+.full-banner { background: #1c1c1c; color: #f7f5f2; text-align: center; padding: 14px 16px; border-radius: 8px; font-size: 15px; margin-bottom: 16px; display: none; }
+.list-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+.list-title { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: #999; }
+.list-count { font-family: 'DM Serif Display', serif; font-size: 28px; color: #1c1c1c; }
+.list-count span { font-family: 'DM Sans', sans-serif; font-size: 13px; color: #aaa; font-weight: 400; margin-left: 4px; }
+.attendees { list-style: none; }
+.attendee-item { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid #e0dcd6; animation: fadeIn 0.25s ease; }
+.attendee-item:first-child { border-top: 1px solid #e0dcd6; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.attendee-name { font-size: 16px; }
+.attendee-num { font-size: 12px; color: #bbb; }
+.empty-state { padding: 32px 0; text-align: center; font-size: 14px; color: #bbb; font-style: italic; }
+.loading { padding: 24px 0; text-align: center; font-size: 14px; color: #bbb; }
+.share-row { margin-top: 40px; display: flex; align-items: center; gap: 12px; }
+.share-label { font-size: 13px; color: #aaa; }
+.share-btn { background: transparent; border: 1.5px solid #e0dcd6; color: #555; padding: 8px 18px; font-size: 13px; border-radius: 8px; }
+.share-btn:hover { background: white; border-color: #ccc; }
+.footer { margin-top: 48px; font-size: 11px; color: #ccc; text-align: center; }
+@media (max-width: 480px) {
+  body { padding: 40px 20px 60px; }
+  h1 { font-size: clamp(32px, 11vw, 48px); }
+  .form-row { flex-direction: column; }
+  button { width: 100%; }
+  .capacity-note { font-size: 13px; }
+  .event-detail { font-size: 13px; }
+}
+#submitFrame { display: none; }
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<iframe id="submitFrame" name="submitFrame"></iframe>
+
+<div class="container">
+  <h1>Primera despedida<br>de Seba Torres:<br><em>edición bowling.</em></h1>
+  <p class="capacity-note" id="capacityNote">Cupos: <strong id="spotsLeft">16</strong> disponibles — el primero que se inscribe, gana.</p>
+  <p class="event-detail">Martes 1 de Abril · 19:00 · Club Providencia, Av. Pocuro 2878</p>
+
+  <div class="full-banner" id="fullBanner">Lista completa — los 16 cupos están tomados. 🎳</div>
+  <div class="form-row">
+    <input type="text" id="nameInput" placeholder="Tu nombre" maxlength="40" autocomplete="off">
+    <button id="addBtn" onclick="addName()">Me apunto</button>
+  </div>
+  <div class="error-msg" id="errorMsg"></div>
+
+  <hr>
+
+  <div class="list-header">
+    <div class="list-title">Anotados</div>
+    <div class="list-count" id="countDisplay">— <span>personas</span></div>
+  </div>
+
+  <div id="loadingState" class="loading">Cargando...</div>
+  <ul class="attendees" id="attendeesList"></ul>
+  <div id="emptyState" class="empty-state" style="display:none;">Nadie aún. Sé el primero.</div>
+
+  <div class="share-row">
+    <span class="share-label">Comparte:</span>
+    <button class="share-btn" onclick="copyLink()">Copiar enlace</button>
+  </div>
+  <div class="footer">Creado con ❤️ por Carla M.</div>
+</div>
+
+<script>
+const FORM_URL   = 'https://docs.google.com/forms/d/e/1FAIpQLSeFnifFA1mAmAG4V_pp3GsoEYNOkct--aCyxp637t4tu77hpg/formResponse';
+const ENTRY_ID   = 'entry.358273542';
+const SHEET_ID   = '1gEUB6k8GJGV4naNviNNf49cKqscJ5iPCxBhHd28Jro8';
+const MAX        = 16;
+
+// ── Leer lista desde Google Sheets (gviz JSONP, no requiere auth) ──
+function loadAttendees() {
+  const existing = document.getElementById('gviz-script');
+  if (existing) existing.remove();
+
+  const script = document.createElement('script');
+  script.id = 'gviz-script';
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=Form_Responses&tqx=responseHandler:onSheetData`;
+  document.head.appendChild(script);
+}
+
+window.onSheetData = function(res) {
+  const rows = res.table.rows;
+  const attendees = rows.slice(1).map(r => r.c[1]?.v).filter(v => v && v !== 'Tu nombre');
+  render(attendees);
+};
+
+function render(attendees) {
+  document.getElementById('loadingState').style.display = 'none';
+  const isFull = attendees.length >= MAX;
+  const note   = document.getElementById('capacityNote');
+  const banner = document.getElementById('fullBanner');
+  const input  = document.getElementById('nameInput');
+  const addBtn = document.getElementById('addBtn');
+
+  document.getElementById('spotsLeft').textContent = Math.max(0, MAX - attendees.length);
+  note.classList.toggle('full', isFull);
+  banner.style.display = isFull ? 'block' : 'none';
+  input.disabled  = isFull;
+  addBtn.disabled = isFull;
+  if (isFull) note.innerHTML = '<strong>Lista completa.</strong> Los 16 cupos están tomados.';
+
+  const list  = document.getElementById('attendeesList');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('countDisplay');
+  list.innerHTML = '';
+
+  if (attendees.length === 0) {
+    empty.style.display = 'block';
+    count.innerHTML = '— <span>personas</span>';
+    return;
+  }
+
+  empty.style.display = 'none';
+  count.innerHTML = `${attendees.length} <span>${attendees.length === 1 ? 'persona' : 'personas'}</span>`;
+  attendees.forEach((name, i) => {
+    const li = document.createElement('li');
+    li.className = 'attendee-item';
+    li.innerHTML = `<span class="attendee-name">${esc(name)}</span><span class="attendee-num">#${i + 1}</span>`;
+    list.appendChild(li);
+  });
+}
+
+// ── Enviar nombre al Google Form via iframe (sin CORS) ──
+function addName() {
+  const input  = document.getElementById('nameInput');
+  const name   = input.value.trim();
+  const error  = document.getElementById('errorMsg');
+  const addBtn = document.getElementById('addBtn');
+  error.textContent = '';
+
+  if (!name) { error.textContent = 'Escribe tu nombre primero.'; input.focus(); return; }
+
+  // Enviar via form oculto → iframe (no hay CORS)
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = FORM_URL;
+  form.target = 'submitFrame';
+
+  const field = document.createElement('input');
+  field.type  = 'hidden';
+  field.name  = ENTRY_ID;
+  field.value = name;
+  form.appendChild(field);
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+
+  input.value     = '';
+  addBtn.disabled = true;
+  addBtn.textContent = '...';
+
+  // Esperar 1.5s y recargar lista
+  setTimeout(() => {
+    loadAttendees();
+    addBtn.disabled    = false;
+    addBtn.textContent = 'Me apunto';
+  }, 1500);
+}
+
+function esc(str) {
+  return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addName();
+});
+
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const btn = document.querySelector('.share-btn');
+    btn.textContent = '¡Copiado!';
+    setTimeout(() => btn.textContent = 'Copiar enlace', 2000);
+  }).catch(() => prompt('Enlace:', window.location.href));
+}
+
+loadAttendees();
+setInterval(loadAttendees, 15000);
+
+// ── Fondo animado ──
+const canvas = document.getElementById('bgCanvas');
+const ctx    = canvas.getContext('2d');
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+const COLORS = ['#e63946','#2196f3','#ff9800','#9c27b0','#00bcd4','#4caf50','#f06292'];
+const balls  = Array.from({length: 7}, (_, i) => ({
+  x: Math.random() * window.innerWidth,
+  y: Math.random() * window.innerHeight,
+  size: 22 + Math.random() * 18,
+  speedX: 0.3 + Math.random() * 0.35,
+  speedY: 0.1 + Math.random() * 0.2,
+  opacity: 0.18 + Math.random() * 0.12,
+  rotation: 0,
+  rotSpeed: 0.015 + Math.random() * 0.01,
+  color: COLORS[i % COLORS.length]
+}));
+
+function drawBall(x, y, r, angle, alpha, color) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y); ctx.rotate(angle);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+  ctx.beginPath(); ctx.arc(-r*.3, -r*.35, r*.22, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  for (const [dx,dy] of [[r*.18,-r*.1],[-r*.05,r*.28],[r*.32,r*.22]]) {
+    ctx.beginPath(); ctx.arc(dx, dy, r*.12, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const b of balls) {
+    drawBall(b.x, b.y, b.size/2, b.rotation, b.opacity, b.color);
+    b.x += b.speedX; b.y += b.speedY; b.rotation += b.rotSpeed;
+    if (b.x > canvas.width  + b.size) { b.x = -b.size; b.y = Math.random() * canvas.height; }
+    if (b.y > canvas.height + b.size) { b.y = -b.size; b.x = Math.random() * canvas.width;  }
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
